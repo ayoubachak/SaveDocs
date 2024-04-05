@@ -10,6 +10,8 @@ import concurrent.futures
 PYPPETEER_CHROMIUM_REVISION = '1263111'
 os.environ['PYPPETEER_CHROMIUM_REVISION'] = PYPPETEER_CHROMIUM_REVISION
 from pyppeteer import launch
+import sys
+import argparse
 
 class WebCrawler:
     def __init__(self, max_concurrent_browsers=5):
@@ -42,8 +44,8 @@ class WebCrawler:
         logger.addHandler(ch)
         return logger
     
-    async def launch_browser_instance(self):
-        browser = await launch(headless=False)
+    async def launch_browser_instance(self, headless=False):
+        browser = await launch(headless=headless)
         self.browser_pool.append(browser)
         try:
             while True:
@@ -141,20 +143,25 @@ class WebCrawler:
 
         self.active_tasks -= 1
 
-    # Methods `fetch_and_save_html`, `generate_pdf`, `setup_logger`, `sanitize_directory_name`, `extract_website_name` remain unchanged.
-
-    async def crawl_website(self, start_url):
+    async def crawl_website(self, start_url, headless=False):
         await self.url_queue.put(start_url)
-        workers = [asyncio.create_task(self.launch_browser_instance()) for _ in range(self.max_concurrent_browsers)]
+        workers = [asyncio.create_task(self.launch_browser_instance(headless=headless)) for _ in range(self.max_concurrent_browsers)]
         await asyncio.gather(*workers)
 
 async def main():
-    crawler = WebCrawler(max_concurrent_browsers=5)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--url", type=str, required=True, help="URL to Crawl")
+    parser.add_argument("--num_workers", type=int, default=5, help="Number of workers")
+    parser.add_argument("--headless", action="store_true", help="Run in headless mode")
+    args = parser.parse_args()
+    start_url = args.url
+    num_workers = args.num_workers
+    headless = args.headless
+    print("Starting %d workers on %s using %s headless mode"%(num_workers, start_url, headless) )
+    
+    crawler = WebCrawler(max_concurrent_browsers=num_workers)
     try:
-        # start_url = 'http://localhost:8000/'
-        start_url = 'https://cucumber.io/docs/'
-        start_url = 'https://doc.rust-lang.org/book/'
-        await crawler.crawl_website(start_url)
+        await crawler.crawl_website(start_url, headless=headless)
     finally:
         for browser in crawler.browser_pool:
             await browser.close()
