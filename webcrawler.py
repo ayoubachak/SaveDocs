@@ -5,12 +5,10 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import re
 import logging
-import concurrent.futures
 
 PYPPETEER_CHROMIUM_REVISION = '1263111'
 os.environ['PYPPETEER_CHROMIUM_REVISION'] = PYPPETEER_CHROMIUM_REVISION
 from pyppeteer import launch
-import sys
 import argparse
 
 class WebCrawler:
@@ -102,7 +100,8 @@ class WebCrawler:
         try:
             page = await browser.newPage()
             # Load the local HTML file
-            await page.goto(f'file:///C:/Users/aachak/Work/Tools/SaveDocs/{html_path}', {'waitUntil': 'networkidle0'})
+            print(f'file:///{os.path.join(os.getcwd(), html_path)}')
+            await page.goto(f'file:///{os.path.join(os.getcwd(), html_path)}', {'waitUntil': 'networkidle0'})
             self.logger.info("Page loaded successfully.")
             # Generate PDF from the rendered HTML
             await page.pdf({'path': pdf_path, 'format': 'A4'})
@@ -136,6 +135,7 @@ class WebCrawler:
                 html = f.read()
                 soup = BeautifulSoup(html, 'html.parser')
                 for a_tag in soup.find_all('a', href=True):
+                    # print('Found : \n' + a_tag['href'] + " in " + url)
                     next_url = urljoin(url, a_tag['href'])
                     next_url_base = next_url.split('#')[0]
                     if next_url_base.startswith(url) and next_url_base not in self.visited_urls:
@@ -149,10 +149,11 @@ class WebCrawler:
         await asyncio.gather(*workers)
 
 async def main():
+    # Example Command : python webcrawler.py --url https://example.com --num_workers 5 --headless
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", type=str, required=True, help="URL to Crawl")
     parser.add_argument("--num_workers", type=int, default=5, help="Number of workers")
-    parser.add_argument("--headless", action="store_true", help="Run in headless mode")
+    parser.add_argument("--headless", action="store_true", help="Run in headless mode") # will either show the browsers or not 
     args = parser.parse_args()
     start_url = args.url
     num_workers = args.num_workers
